@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign Up | AI Translation System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Create an account to access AI Translation System tools including text translation, OCR, and PDF processing."/>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50 min-h-screen flex items-center justify-center">
+
+  <div class="bg-white p-8 rounded-3xl shadow-md w-full max-w-md">
+
+    <h2 class="text-2xl font-bold text-center mb-2">
+      Create an Account
+    </h2>
+    <p class="text-center text-slate-600 mb-6 text-sm">
+      Get started with AI Translation System
+    </p>
+
+    <form id="signupForm" novalidate>
+
+      <label for="fullName" class="block text-sm font-medium mb-1">Full Name</label>
+      <input id="fullName" type="text" required autocomplete="name"
+        class="w-full border rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+
+      <label for="email" class="block text-sm font-medium mb-1">Email</label>
+      <input id="email" type="email" required autocomplete="email"
+        class="w-full border rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+
+      <label for="password" class="block text-sm font-medium mb-1">Password</label>
+      <input id="password" type="password" required autocomplete="new-password"
+        class="w-full border rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+
+      <label for="confirmPassword" class="block text-sm font-medium mb-1">Confirm Password</label>
+      <input id="confirmPassword" type="password" required autocomplete="new-password"
+        class="w-full border rounded-lg p-2 mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+
+      <button id="signupBtn" type="submit"
+        class="w-full bg-blue-600 text-white py-2.5 rounded-full font-medium hover:bg-blue-700 transition">
+        Sign Up
+      </button>
+
+      <p id="errorMsg" class="text-red-500 text-sm mt-4 hidden"></p>
+
+    </form>
+
+    <p class="text-center text-sm mt-5">
+      Already have an account?
+      <a href="auth.html" class="text-blue-600 font-medium hover:underline">
+        Login
+      </a>
+    </p>
+
+  </div>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+  // =============================
+  // ENVIRONMENT-AWARE API URL
+  // =============================
+  const API_BASE_URL =
+    location.hostname === "127.0.0.1" || location.hostname === "localhost"
+      ? "http://127.0.0.1:8000"
+      : location.origin;
+
+  // =============================
+  // SAFE JWT CHECK
+  // =============================
+  function isTokenExpired(token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return true;
+
+      const payload = JSON.parse(atob(parts[1]));
+      if (!payload.exp) return true;
+
+      return Date.now() > payload.exp * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  // Auto redirect if already logged in
+  const existingToken = localStorage.getItem("token");
+  if (existingToken && !isTokenExpired(existingToken)) {
+    window.location.replace("dashboard.html");
+    return;
+  }
+
+  if (existingToken && isTokenExpired(existingToken)) {
+    localStorage.removeItem("token");
+  }
+
+  const form = document.getElementById("signupForm");
+  const errorMsg = document.getElementById("errorMsg");
+  const signupBtn = document.getElementById("signupBtn");
+
+  // =============================
+  // ERROR MAPPER
+  // =============================
+  function mapErrorMessage(code) {
+    const errorMap = {
+      INVALID_CREDENTIALS: "Invalid email or password.",
+      INVALID_TOKEN: "Session expired. Please login again.",
+      EMAIL_ALREADY_REGISTERED: "This email is already registered.",
+      VALIDATION_ERROR: "Please check your input fields.",
+      HTTP_401: "Unauthorized request.",
+      HTTP_403: "Access denied.",
+      HTTP_429: "Too many requests. Please wait and try again.",
+      INTERNAL_SERVER_ERROR: "Something went wrong. Please try again later."
+    };
+
+    return errorMap[code] || "Registration failed. Please try again.";
+  }
+
+  // =============================
+  // SIGNUP HANDLER
+  // =============================
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const fullName = document.getElementById("fullName").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+
+    errorMsg.classList.add("hidden");
+    errorMsg.textContent = "";
+
+    if (!fullName || !email || !password || !confirmPassword) {
+      errorMsg.textContent = "All fields are required.";
+      errorMsg.classList.remove("hidden");
+      return;
+    }
+
+    if (password.length < 6) {
+      errorMsg.textContent = "Password must be at least 6 characters.";
+      errorMsg.classList.remove("hidden");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      errorMsg.textContent = "Passwords do not match.";
+      errorMsg.classList.remove("hidden");
+      return;
+    }
+
+    signupBtn.disabled = true;
+    signupBtn.textContent = "Creating account...";
+
+    try {
+
+      // ---- SIGNUP ----
+      const response = await fetch(`${API_BASE_URL}/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          full_name: fullName,
+          email,
+          password
+        })
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Unexpected server response.");
+      }
+
+      if (!response.ok) {
+        throw new Error(mapErrorMessage(data.message));
+      }
+
+      // ---- AUTO LOGIN ----
+      const loginResponse = await fetch(`${API_BASE_URL}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      let loginData;
+      try {
+        loginData = await loginResponse.json();
+      } catch {
+        throw new Error("Unexpected login response.");
+      }
+
+      if (!loginResponse.ok || !loginData.access_token) {
+        throw new Error("Auto-login failed. Please login manually.");
+      }
+
+      localStorage.setItem("token", loginData.access_token);
+
+      window.location.replace("dashboard.html");
+
+    } catch (error) {
+
+      if (error instanceof TypeError) {
+        errorMsg.textContent = "Unable to connect to server.";
+      } else {
+        errorMsg.textContent = error.message;
+      }
+
+      errorMsg.classList.remove("hidden");
+
+    } finally {
+      signupBtn.disabled = false;
+      signupBtn.textContent = "Sign Up";
+    }
+
+  });
+
+});
+
+</script>
+
+</body>
+</html>

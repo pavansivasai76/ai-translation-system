@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OCR Translation</title>
+
+<meta name="description" content="Extract text from Nepali or Hindi images and translate into English using AI-powered OCR." />
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style>
+</head>
+
+<body class="bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-gray-800">
+
+<!-- ================= NAVBAR ================= -->
+<nav class="w-full bg-white border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="dashboard.html" class="text-xl font-bold text-blue-600">
+      AI Translation System
+    </a>
+    <div class="flex items-center gap-4">
+      <a href="dashboard.html" class="text-slate-700 font-medium hover:text-blue-600">
+        ← Dashboard
+      </a>
+      <button id="logoutBtn"
+         class="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-red-600">
+        Logout
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<section class="text-center py-16">
+  <h1 class="text-5xl font-bold">
+    OCR <span class="text-indigo-500">Translation</span>
+  </h1>
+  <p class="mt-4 text-gray-500 max-w-2xl mx-auto">
+    Extract text from images in Nepali or Hindi and translate it into English.
+  </p>
+</section>
+
+<!-- ================= OCR WORKSPACE ================= -->
+<section class="max-w-7xl mx-auto px-6 pb-20">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- INPUT PANEL -->
+    <div class="bg-white rounded-2xl shadow p-6 relative">
+
+      <label class="block text-sm font-medium text-gray-600 mb-2">
+        Upload Image (PNG / JPG)
+      </label>
+
+      <input id="imageInput" type="file" accept="image/png, image/jpeg"
+        class="w-full mb-4 border rounded-lg p-2 text-sm">
+
+      <textarea id="inputText"
+        class="w-full h-56 resize-none outline-none text-gray-700 text-base"
+        placeholder="Extracted Nepali or Hindi text will appear here..."
+        readonly></textarea>
+
+      <div class="absolute bottom-4 left-6 right-6 flex justify-between items-center text-gray-400 text-sm">
+        <span>OCR Output</span>
+
+        <button id="ocrBtn"
+          class="bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition">
+          Extract & Translate
+        </button>
+      </div>
+    </div>
+
+    <!-- OUTPUT PANEL -->
+    <div class="bg-white rounded-2xl shadow p-6 relative">
+      <textarea id="outputText"
+        class="w-full h-80 resize-none outline-none text-gray-700 text-base bg-transparent"
+        placeholder="English translation will appear here..."
+        readonly></textarea>
+
+      <div class="absolute bottom-4 right-6 flex gap-3 text-gray-400">
+        <span id="copyBtn" class="material-icons-outlined cursor-pointer">
+          content_copy
+        </span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+  // =============================
+  // ENVIRONMENT-AWARE API URL
+  // =============================
+  const API_BASE_URL =
+    location.hostname === "127.0.0.1" || location.hostname === "localhost"
+      ? "http://127.0.0.1:8000"
+      : location.origin;
+
+  // =============================
+  // SAFE JWT CHECK
+  // =============================
+  function isTokenExpired(token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return true;
+
+      const payload = JSON.parse(atob(parts[1]));
+      if (!payload.exp) return true;
+
+      return Date.now() > payload.exp * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem("token");
+    window.location.replace("auth.html");
+  }
+
+  const token = localStorage.getItem("token");
+
+  if (!token || isTokenExpired(token)) {
+    localStorage.removeItem("token");
+    logout();
+    return;
+  }
+
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
+  // =============================
+  // ERROR MAPPER
+  // =============================
+  function mapErrorMessage(code) {
+    const errorMap = {
+      INVALID_TOKEN: "Session expired. Please login again.",
+      HTTP_401: "Unauthorized request.",
+      HTTP_403: "Access denied.",
+      HTTP_429: "Too many requests. Please wait and try again.",
+      INTERNAL_SERVER_ERROR: "Something went wrong. Please try again."
+    };
+
+    return errorMap[code] || "OCR request failed.";
+  }
+
+  // =============================
+  // OCR HANDLER
+  // =============================
+  const ocrBtn = document.getElementById("ocrBtn");
+  const imageInput = document.getElementById("imageInput");
+  const inputText = document.getElementById("inputText");
+  const outputText = document.getElementById("outputText");
+  const copyBtn = document.getElementById("copyBtn");
+
+  ocrBtn.addEventListener("click", extractAndTranslate);
+
+  copyBtn.addEventListener("click", () => {
+    navigator.clipboard.writeText(outputText.value);
+  });
+
+  async function extractAndTranslate() {
+
+    if (!imageInput.files.length) {
+      outputText.value = "Please upload an image first.";
+      return;
+    }
+
+    const file = imageInput.files[0];
+
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      outputText.value = "Invalid file type. Please upload PNG or JPG.";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    ocrBtn.disabled = true;
+    ocrBtn.textContent = "Processing...";
+    inputText.value = "Extracting text...";
+    outputText.value = "Translating...";
+
+    try {
+
+      const response = await fetch(`${API_BASE_URL}/ocr`, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token
+        },
+        body: formData
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Unexpected server response.");
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) logout();
+        throw new Error(mapErrorMessage(data.message));
+      }
+
+      inputText.value = data.extracted_text || "";
+      outputText.value = data.translated_text || "";
+
+    } catch (error) {
+
+      if (error instanceof TypeError) {
+        outputText.value = "Unable to connect to server.";
+      } else {
+        outputText.value = error.message;
+      }
+
+    } finally {
+      ocrBtn.disabled = false;
+      ocrBtn.textContent = "Extract & Translate";
+    }
+  }
+
+});
+
+</script>
+
+</body>
+</html>

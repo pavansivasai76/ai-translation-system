@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Login | AI Translation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content="Login to AI Translation System to access translation, OCR, and PDF processing tools."/>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
+        <h2 class="text-2xl font-bold text-center mb-6">Login</h2>
+
+        <form id="loginForm" novalidate>
+
+            <label for="email" class="block text-sm font-medium mb-1">Email</label>
+            <input 
+                id="email"
+                type="email"
+                required
+                autocomplete="email"
+                class="w-full border rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <label for="password" class="block text-sm font-medium mb-1">Password</label>
+            <input 
+                id="password"
+                type="password"
+                required
+                autocomplete="current-password"
+                class="w-full border rounded-lg p-2 mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <button 
+                id="loginBtn"
+                type="submit"
+                class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                Login
+            </button>
+
+            <p id="errorMsg" class="text-red-500 text-sm mt-4 hidden"></p>
+
+        </form>
+
+        <p class="text-center text-sm mt-4">
+            Don’t have an account?
+            <a href="signup.html" class="text-blue-600 font-medium hover:underline">
+                Sign up
+            </a>
+        </p>
+    </div>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    // =============================
+    // API CONFIG
+    // =============================
+    const API_BASE_URL = 
+        location.hostname === "127.0.0.1" || location.hostname === "localhost"
+        ? "http://127.0.0.1:8000"
+        : location.origin;
+
+    // =============================
+    // SAFE JWT CHECK
+    // =============================
+    function isTokenExpired(token) {
+        try {
+            const parts = token.split(".");
+            if (parts.length !== 3) return true;
+
+            const payload = JSON.parse(atob(parts[1]));
+            if (!payload.exp) return true;
+
+            return Date.now() > payload.exp * 1000;
+        } catch {
+            return true;
+        }
+    }
+
+    // =============================
+    // AUTO REDIRECT IF TOKEN VALID
+    // =============================
+    const existingToken = localStorage.getItem("token");
+
+    if (existingToken && !isTokenExpired(existingToken)) {
+        window.location.replace("dashboard.html");
+        return;
+    }
+
+    if (existingToken && isTokenExpired(existingToken)) {
+        localStorage.removeItem("token");
+    }
+
+    const form = document.getElementById("loginForm");
+    const errorMsg = document.getElementById("errorMsg");
+    const loginBtn = document.getElementById("loginBtn");
+
+    // =============================
+    // ERROR MAPPER
+    // =============================
+    function mapErrorMessage(code) {
+        const errorMap = {
+            INVALID_CREDENTIALS: "Invalid email or password.",
+            INVALID_TOKEN: "Session expired. Please login again.",
+            VALIDATION_ERROR: "Please check your input fields.",
+            HTTP_401: "Unauthorized request.",
+            HTTP_403: "Access denied.",
+            HTTP_429: "Too many requests. Please wait and try again.",
+            INTERNAL_SERVER_ERROR: "Something went wrong. Please try again later."
+        };
+
+        return errorMap[code] || "Login failed. Please try again.";
+    }
+
+    // =============================
+    // LOGIN HANDLER
+    // =============================
+    form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        errorMsg.classList.add("hidden");
+        errorMsg.textContent = "";
+
+        if (!email || !password) {
+            errorMsg.textContent = "Please enter both email and password.";
+            errorMsg.classList.remove("hidden");
+            return;
+        }
+
+        loginBtn.disabled = true;
+        loginBtn.textContent = "Logging in...";
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ email, password })
+            });
+
+            let data;
+            try {
+                data = await response.json();
+            } catch {
+                throw new Error("Unexpected server response.");
+            }
+
+            if (!response.ok) {
+                throw new Error(mapErrorMessage(data.message));
+            }
+
+            if (!data.access_token) {
+                throw new Error("Invalid authentication response.");
+            }
+
+            localStorage.setItem("token", data.access_token);
+
+            window.location.replace("dashboard.html");
+
+        } catch (error) {
+
+            if (error instanceof TypeError) {
+                errorMsg.textContent = "Unable to connect to server.";
+            } else {
+                errorMsg.textContent = error.message;
+            }
+
+            errorMsg.classList.remove("hidden");
+
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.textContent = "Login";
+        }
+    });
+
+});
+
+</script>
+
+</body>
+</html>

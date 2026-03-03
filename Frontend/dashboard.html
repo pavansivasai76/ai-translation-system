@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard | AI Translation System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Dashboard for AI Translation System. Access translation, OCR, and PDF tools."/>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-b from-slate-50 to-white text-slate-800">
+
+  <!-- NAVBAR -->
+  <nav class="w-full bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+
+      <div class="text-xl font-bold text-blue-600">
+        AI Translation System
+      </div>
+
+      <button id="logoutBtn"
+         class="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-red-600 transition">
+        Logout
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="min-h-screen flex flex-col items-center">
+
+    <section class="w-full max-w-6xl px-6 pt-20 pb-12 text-center">
+
+      <div class="flex justify-center mb-6">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 text-sm font-medium">
+          <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+          Welcome Back
+        </div>
+      </div>
+
+      <h1 class="text-4xl md:text-6xl font-extrabold leading-tight tracking-tight">
+        Break Language Barriers
+        <span class="block text-blue-600 mt-1">Instantly.</span>
+      </h1>
+
+      <p class="mt-6 max-w-3xl mx-auto text-lg text-slate-600 leading-relaxed">
+        Select a feature below to translate Nepali or Hindi content into English.
+      </p>
+
+    </section>
+
+    <!-- FEATURES -->
+    <section class="w-full max-w-7xl px-6 pb-24 mt-6">
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-10 items-stretch">
+
+        <!-- Smart Translation -->
+        <div class="bg-white rounded-3xl shadow-md p-10 border border-slate-100 min-h-[300px] flex flex-col justify-between">
+          <div>
+            <div class="w-14 h-14 flex items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-6 text-xl">
+              🌐
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Smart Translation</h3>
+            <p class="text-slate-600 text-base leading-relaxed mb-6">
+              Translate Nepali and Hindi text into accurate English using AI.
+            </p>
+          </div>
+          <a href="translate.html"
+             class="inline-flex justify-center items-center bg-blue-600 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-blue-700 transition">
+            Translate Text →
+          </a>
+        </div>
+
+        <!-- OCR -->
+        <div class="bg-white rounded-3xl shadow-md p-10 border border-slate-100 min-h-[300px] flex flex-col justify-between">
+          <div>
+            <div class="w-14 h-14 flex items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-6 text-xl">
+              📷
+            </div>
+            <h3 class="text-xl font-semibold mb-3">OCR Capability</h3>
+            <p class="text-slate-600 text-base leading-relaxed mb-6">
+              Extract and translate Nepali or Hindi text from images and scanned documents.
+            </p>
+          </div>
+          <a href="ocr.html"
+             class="inline-flex justify-center items-center bg-blue-600 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-blue-700 transition">
+            Upload Image →
+          </a>
+        </div>
+
+        <!-- PDF -->
+        <div class="bg-white rounded-3xl shadow-md p-10 border border-slate-100 min-h-[300px] flex flex-col justify-between">
+          <div>
+            <div class="w-14 h-14 flex items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-6 text-xl">
+              📄
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Document Processing</h3>
+            <p class="text-slate-600 text-base leading-relaxed mb-6">
+              Upload Nepali or Hindi PDF documents and receive translated English text.
+            </p>
+          </div>
+          <a href="pdf.html"
+             class="inline-flex justify-center items-center bg-blue-600 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-blue-700 transition">
+            Upload PDF →
+          </a>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+  // =============================
+  // SAFE JWT CHECK
+  // =============================
+  function isTokenExpired(token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return true;
+
+      const payload = JSON.parse(atob(parts[1]));
+      if (!payload.exp) return true;
+
+      return Date.now() > payload.exp * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem("token");
+    window.location.replace("auth.html");
+  }
+
+  // =============================
+  // AUTH GUARD
+  // =============================
+  const token = localStorage.getItem("token");
+
+  if (!token || isTokenExpired(token)) {
+    localStorage.removeItem("token");
+    logout();
+    return;
+  }
+
+  // Attach logout event safely
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
+});
+
+</script>
+
+</body>
+</html>

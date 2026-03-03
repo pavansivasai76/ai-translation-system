@@ -1,0 +1,48 @@
+# =========================
+# Core Backend
+# =========================
+fastapi==0.110.0
+uvicorn==0.27.1
+starlette==0.36.3
+
+# =========================
+# Database
+# =========================
+SQLAlchemy==2.0.46
+psycopg2-binary==2.9.11
+
+# =========================
+# Auth & Security
+# =========================
+passlib[bcrypt]==1.7.4
+python-jose==3.5.0
+python-dotenv==1.2.1
+
+# =========================
+# Validation
+# =========================
+pydantic==2.6.4
+python-multipart==0.0.9
+
+# =========================
+# ML / NLP
+# =========================
+torch==2.0.0
+transformers==4.36.0
+huggingface-hub==0.20.3
+sentencepiece==0.2.0
+langdetect==1.0.9
+
+# =========================
+# OCR & PDF
+# =========================
+pytesseract==0.3.13
+opencv-python-headless==4.9.0.80
+pillow==12.1.0
+pdfplumber==0.11.9
+PyMuPDF==1.26.7
+
+# =========================
+# Document Export
+# =========================
+python-docx==1.2.0

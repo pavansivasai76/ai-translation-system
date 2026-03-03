@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI Translation System
 
 AI-powered translation system supporting:
@@ -28,3 +29,6 @@ FRONTEND_ORIGIN=http://127.0.0.1:5500
 
 5. Run:
    uvicorn main:app --reload
+=======
+# ai-translation-system
+>>>>>>> 5819c01dfdc0d33ad36f77bf4090bb319f2f6003

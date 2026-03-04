@@ -4,6 +4,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from app.database import engine
+from app.models import Base
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -51,7 +53,7 @@ if not SECRET_KEY:
 # =========================================================
 app = FastAPI(title="AI Translation System")
 
-
+Base.metadata.create_all(bind=engine)
 # =========================================================
 # CORS CONFIG
 # =========================================================

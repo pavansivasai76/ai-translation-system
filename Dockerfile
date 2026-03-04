@@ -16,13 +16,19 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
     tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-hin \
+    tesseract-ocr-nep \
     libtesseract-dev \
     libleptonica-dev \
     poppler-utils \
+    libgl1 \
     curl \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
 # =========================
 # Set Work Directory
 # =========================

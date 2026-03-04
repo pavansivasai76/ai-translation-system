@@ -10,9 +10,9 @@ import os
 # TESSERACT PATH (Windows)
 # ---------------------------------------------------------
 if os.name == "nt":
-    pytesseract.pytesseract.tesseract_cmd = (
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    )
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 
 # ---------------------------------------------------------

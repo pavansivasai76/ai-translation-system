@@ -13,8 +13,6 @@ ENV PYTHONUNBUFFERED=1
 # Install System Dependencies
 # =========================
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-hin \
@@ -23,8 +21,7 @@ RUN apt-get update && apt-get install -y \
     libleptonica-dev \
     poppler-utils \
     libgl1 \
-    curl \
-    git \
+    && which tesseract \
     && rm -rf /var/lib/apt/lists/*
 
 

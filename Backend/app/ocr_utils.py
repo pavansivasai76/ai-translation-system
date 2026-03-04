@@ -5,15 +5,14 @@ from PIL import Image
 from io import BytesIO
 import re
 import os
-
+import shutil
 # ---------------------------------------------------------
 # TESSERACT PATH (Windows)
 # ---------------------------------------------------------
 if os.name == "nt":
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 else:
-    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-
+    pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 # ---------------------------------------------------------
 # BASIC OCR TEXT CLEANING (NEWLINE-SAFE)

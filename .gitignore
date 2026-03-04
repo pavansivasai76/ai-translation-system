@@ -1,19 +1,15 @@
-# Python
-venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Environment
-.env
-
-# OS
-.DS_Store
-
-# Logs
+*.db
+*.sqlite3
 *.log
-
-# IDE
-.vscode/
-.idea/
+.env
+venv/
+.env.*
+.git/
+.gitignore
+node_modules/
+dist/
+build/

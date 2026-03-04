@@ -1,3 +1,4 @@
+this is is my entire main.py
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -27,6 +28,7 @@ from app.pdf_utils import extract_pdf_pages
 from fastapi.responses import JSONResponse
 from fastapi.requests import Request
 from fastapi.exceptions import RequestValidationError
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from fastapi.responses import StreamingResponse
@@ -35,17 +37,17 @@ from docx import Document
 
 
 # =========================================================
-# LOAD ENV VARIABLES
+# LOAD ENV VARIABLES (SECURITY FIX)
 # =========================================================
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5500")
 
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY not set in environment variables")
-
 
 # =========================================================
 # APP INIT
@@ -53,10 +55,8 @@ if not SECRET_KEY:
 app = FastAPI(title="AI Translation System")
 
 Base.metadata.create_all(bind=engine)
-
-
 # =========================================================
-# CORS CONFIG  (FIXED FOR VERCEL)
+# CORS CONFIG
 # =========================================================
 app.add_middleware(
     CORSMiddleware,
@@ -69,11 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# =========================================================
-# ERROR HANDLERS
-# =========================================================
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
@@ -98,6 +93,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -108,7 +104,6 @@ async def global_exception_handler(request: Request, exc: Exception):
             "message": "Something went wrong."
         },
     )
-
 
 # =========================================================
 # PASSWORD HASHING
@@ -132,7 +127,6 @@ def get_db():
     finally:
         db.close()
 
-
 # =========================================================
 # FILE SIZE LIMITS
 # =========================================================
@@ -142,7 +136,6 @@ MAX_PDF_SIZE_MB = 10
 MAX_IMAGE_SIZE = MAX_IMAGE_SIZE_MB * 1024 * 1024
 MAX_PDF_SIZE = MAX_PDF_SIZE_MB * 1024 * 1024
 
-
 # =========================================================
 # DOWNLOAD SIZE LIMIT
 # =========================================================
@@ -151,10 +144,10 @@ MAX_DOWNLOAD_SIZE = MAX_DOWNLOAD_SIZE_MB * 1024 * 1024
 
 
 # =========================================================
-# RATE LIMITING
+# RATE LIMITING CONFIG
 # =========================================================
-RATE_LIMIT_REQUESTS = 20
-RATE_LIMIT_WINDOW = 60
+RATE_LIMIT_REQUESTS = 20        # Max requests
+RATE_LIMIT_WINDOW = 60          # Per 60 seconds
 
 user_request_log = {}
 
@@ -203,9 +196,8 @@ def get_current_user(
 
     return user
 
-
 # =========================================================
-# RATE LIMIT CHECK
+# RATE LIMIT CHECKER
 # =========================================================
 def check_rate_limit(user_email: str):
     now = datetime.utcnow().timestamp()
@@ -213,6 +205,7 @@ def check_rate_limit(user_email: str):
     if user_email not in user_request_log:
         user_request_log[user_email] = []
 
+    # Keep only requests inside window
     user_request_log[user_email] = [
         t for t in user_request_log[user_email]
         if now - t < RATE_LIMIT_WINDOW
@@ -225,7 +218,6 @@ def check_rate_limit(user_email: str):
         )
 
     user_request_log[user_email].append(now)
-
 
 # =========================================================
 # LOAD MODEL
@@ -246,7 +238,6 @@ model = AutoModelForSeq2SeqLM.from_pretrained(
 
 model.eval()
 
-
 def warmup_model():
     dummy_text = "hin_Deva eng_Latn नमस्ते दुनिया"
     inputs = tokenizer(dummy_text, return_tensors="pt").to(device)
@@ -256,16 +247,450 @@ def warmup_model():
 
 
 # =========================================================
-# STARTUP
+# LANGUAGE MAP
 # =========================================================
+LANG_MAP = {
+    "hi": "hin_Deva",
+    "ne": "npi_Deva",
+    "en": "eng_Latn"
+}
+
+
+# =========================================================
+# SCHEMAS
+# =========================================================
+class TranslateRequest(BaseModel):
+    text: str
+    source_lang: Optional[str] = None
+
+
+class TranslateResponse(BaseModel):
+    translated_text: str
+    detected_language: str
+
+
+class SignupRequest(BaseModel):
+    full_name: str
+    email: str
+    password: str
+
+
+class SignupResponse(BaseModel):
+    message: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+class ErrorResponse(BaseModel):
+    success: bool
+    error_code: str
+    message: str
+# =========================================================
+# SIGNUP API
+# =========================================================
+@app.post("/signup", response_model=SignupResponse)
+def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+
+    existing_user = db.query(User).filter(User.email == payload.email).first()
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    safe_password = payload.password[:72]
+    hashed_password = pwd_context.hash(safe_password)
+
+    new_user = User(
+        full_name=payload.full_name,
+        email=payload.email,
+        hashed_password=hashed_password
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "User registered successfully"}
+
+
+# =========================================================
+# LOGIN API
+# =========================================================
+@app.post("/login", response_model=TokenResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+
+    user = db.query(User).filter(User.email == payload.email).first()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="INVALID_CREDENTIALS")
+
+    if not pwd_context.verify(payload.password[:72], user.hashed_password):
+        raise HTTPException(status_code=400, detail="INVALID_CREDENTIALS")
+
+    access_token = create_access_token(
+        data={"sub": user.email}
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
 @app.on_event("startup")
 def startup_event():
     warmup_model()
 
 
 # =========================================================
-# ROOT
+# LANGUAGE DETECTION
 # =========================================================
+def is_devanagari(text: str) -> bool:
+    return bool(re.search(r"[\u0900-\u097F]", text))
+
+
+def detect_hi_ne(text: str) -> str:
+    nepali_markers = ["छ", "छु", "छैन", "थियो", "गर्छ", "हुन्छ", "लाई", "बाट"]
+    hindi_markers = ["है", "हैं", "था", "थे", "करता", "किया", "को", "से"]
+
+    nepali_score = sum(text.count(w) for w in nepali_markers)
+    hindi_score = sum(text.count(w) for w in hindi_markers)
+
+    return "ne" if nepali_score > hindi_score else "hi"
+
+
+def detect_language(text: str) -> str:
+    if is_devanagari(text):
+        return detect_hi_ne(text)
+
+    try:
+        if detect(text) == "en":
+            return "en"
+    except LangDetectException:
+        pass
+
+    return "unknown"
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "model_loaded": True,
+        "device": device
+    }
+
+# =========================================================
+# TRANSLATION CORE
+# =========================================================
+def translate_core(text: str) -> tuple[str, str]:
+
+    text = text.strip()
+
+    if not text or len(text) < 5:
+        return "", "unknown"
+
+    # Hard cap input length
+    text = text[:4000]
+
+    src_lang = detect_language(text)
+
+    if src_lang not in ("hi", "ne", "en"):
+        return "", "unknown"
+
+    if src_lang == "en":
+        return text, "en"
+
+    # Split into sentences
+    sentences = [
+        s.strip()
+        for s in re.split(r'(?<=[।.!?])\s+', text)
+        if s.strip()
+    ]
+
+    if not sentences:
+        return "", "unknown"
+
+    # Add language tags
+    tagged_texts = [
+        f"{LANG_MAP[src_lang]} {LANG_MAP['en']} {sentence}"
+        for sentence in sentences
+    ]
+
+    # Batch tokenize
+    inputs = tokenizer(
+        tagged_texts,
+        return_tensors="pt",
+        padding=True,
+        truncation=True
+    ).to(device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=256,      # dynamic generation length
+            num_beams=2,             # reduced beams (faster)
+            early_stopping=True,
+            use_cache=True
+        )
+
+    # Decode batch output
+    translated_sentences = tokenizer.batch_decode(
+        outputs,
+        skip_special_tokens=True
+    )
+
+    translated_text = " ".join(translated_sentences)
+
+    return translated_text.strip(), src_lang
+
+
+# =========================================================
+# BLOCK SPLITTER
+# =========================================================
+def split_blocks(text: str) -> List[str]:
+    markers = [
+        "Information",
+        "Notice",
+        "Announcement",
+        "Organized",
+        "Date",
+        "Head Boy",
+        "Principal",
+        "सूचना",
+        "विद्यालय",
+        "दिनांक"
+    ]
+
+    blocks = []
+    current = ""
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        if any(m.lower() in line.lower() for m in markers) and current:
+            blocks.append(current.strip())
+            current = line
+        else:
+            current += " " + line
+
+    if current:
+        blocks.append(current.strip())
+
+    return blocks
+
+
+# =========================================================
+# BEAUTIFY
+# =========================================================
+def beautify_translation(text: str) -> str:
+
+    two_group_patterns = [
+        r"(Information|Notice|Announcement)\s+(\d{1,2}\s+\w+\s+20XX)",
+        r"(Information|Notice)\s*:\s*(\w+\s+\d{1,2},\s+20XX)"
+    ]
+
+    one_group_patterns = [
+        r"(Awareness campaign on cleanliness)",
+        r"(Khadi Textiles Discount Announcement)",
+        r"(The change in school time)",
+        r"(of the Poet's Conference)"
+    ]
+
+    for p in two_group_patterns:
+        text = re.sub(p, r"\1\n\2", text, flags=re.IGNORECASE)
+
+    for p in one_group_patterns:
+        text = re.sub(p, r"\n\1\n", text, flags=re.IGNORECASE)
+
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text.strip()
+
+
+# =========================================================
+# PROTECTED TRANSLATE API
+# =========================================================
+@app.post("/translate", response_model=TranslateResponse)
+def translate_text(
+    payload: TranslateRequest,
+    current_user: User = Depends(get_current_user)
+):
+    check_rate_limit(current_user.email)
+    translated_text, detected_lang = translate_core(payload.text)
+    return {
+        "translated_text": translated_text,
+        "detected_language": detected_lang
+    }
+
+
+# (Everything above remains EXACTLY the same — unchanged)
+
+# =========================================================
+# PROTECTED OCR API
+# =========================================================
+@app.post("/ocr")
+async def ocr_translate(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    check_rate_limit(current_user.email)
+    # Validate file type
+    if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+
+    image_bytes = await file.read()
+
+    # Validate file size
+    if len(image_bytes) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image too large. Max size {MAX_IMAGE_SIZE_MB}MB"
+        )
+
+    extracted_text = extract_text_from_image(image_bytes)
+
+    if not extracted_text:
+        return {
+            "extracted_text": "",
+            "translated_text": "No readable text detected in image"
+        }
+
+    translated_text, detected_lang = translate_core(extracted_text)
+
+    return {
+        "extracted_text": extracted_text,
+        "translated_text": translated_text,
+        "detected_language": detected_lang
+    }
+
+
+# =========================================================
+# PROTECTED PDF API
+# =========================================================
+@app.post("/pdf")
+async def pdf_translate(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    check_rate_limit(current_user.email)
+    # Validate file type
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Invalid PDF format")
+
+    pdf_bytes = await file.read()
+
+    # Validate file size
+    if len(pdf_bytes) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"PDF too large. Max size {MAX_PDF_SIZE_MB}MB"
+        )
+
+    pages = extract_pdf_pages(pdf_bytes)
+
+    if not pages:
+        return {
+            "pages": [],
+            "message": "No readable text detected in PDF"
+        }
+
+    translated_pages = []
+
+    for page in pages:
+        raw_text = page.get("text", "").strip()
+        if not raw_text or len(raw_text) < 10:
+            continue
+
+        blocks = split_blocks(raw_text)
+        translated_blocks = []
+
+        for block in blocks:
+            translated, detected_lang = translate_core(block)
+            if translated:
+                translated_blocks.append(
+                    beautify_translation(translated)
+                )
+
+        translated_pages.append({
+            "page_number": page["page_number"],
+            "extracted_text": raw_text,
+            "translated_text": "\n\n".join(translated_blocks),
+            "detected_language": detected_lang
+        })
+
+    return {
+        "total_pages_processed": len(translated_pages),
+        "pages": translated_pages
+    }
+@app.post("/download/txt")
+def download_txt(
+    content: dict,
+    current_user: User = Depends(get_current_user)
+):
+    check_rate_limit(current_user.email)
+
+    text = content.get("text", "")
+
+    if not text:
+        raise HTTPException(status_code=400, detail="No content provided")
+
+    if len(text.encode("utf-8")) > MAX_DOWNLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Download size exceeds {MAX_DOWNLOAD_SIZE_MB}MB limit"
+        )
+
+    buffer = BytesIO()
+    buffer.write(text.encode("utf-8"))
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": "attachment; filename=translation.txt"
+        }
+    )
+
+@app.post("/download/docx")
+def download_docx(
+    content: dict,
+    current_user: User = Depends(get_current_user)
+):
+    check_rate_limit(current_user.email)
+
+    text = content.get("text", "")
+
+    if not text:
+        raise HTTPException(status_code=400, detail="No content provided")
+
+    if len(text.encode("utf-8")) > MAX_DOWNLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Download size exceeds {MAX_DOWNLOAD_SIZE_MB}MB limit"
+        )
+
+    document = Document()
+    document.add_paragraph(text)
+
+    buffer = BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": "attachment; filename=translation.docx"
+        }
+    )
 @app.get("/")
 def root():
     return {"message": "AI Translation System API is running"}

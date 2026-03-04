@@ -13,9 +13,7 @@ import shutil
 # TESSERACT PATH (Windows + Linux)
 # ---------------------------------------------------------
 
-if os.name == "nt":
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-else:
+if os.name != "nt":
     pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 # ---------------------------------------------------------
 # BASIC OCR TEXT CLEANING (NEWLINE-SAFE)

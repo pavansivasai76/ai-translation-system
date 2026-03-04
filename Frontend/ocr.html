@@ -101,10 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // =============================
   // ENVIRONMENT-AWARE API URL
   // =============================
-  const API_BASE_URL =
-    location.hostname === "127.0.0.1" || location.hostname === "localhost"
-      ? "https://ai-translation-system-production.up.railway.app"
-      : location.origin;
+  const API_BASE_URL = "https://ai-translation-system-production.up.railway.app";
 
   // =============================
   // SAFE JWT CHECK

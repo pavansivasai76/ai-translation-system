@@ -13,8 +13,6 @@ ENV PYTHONUNBUFFERED=1
 # Install System Dependencies
 # =========================
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-hin \
@@ -23,20 +21,22 @@ RUN apt-get update && apt-get install -y \
     libleptonica-dev \
     poppler-utils \
     libgl1 \
-    curl \
-    git \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
     && which tesseract \
     && tesseract --version \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+
 # =========================
 # Set Work Directory
 # =========================
 WORKDIR /app
 
 # =========================
-# Copy Requirements First (Docker Cache Optimization)
+# Copy Requirements
 # =========================
 COPY Backend/requirements.txt .
 
@@ -47,7 +47,7 @@ RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # =========================
-# Copy Backend App Files
+# Copy Backend App
 # =========================
 COPY Backend/app/ .
 

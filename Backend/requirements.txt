@@ -27,6 +27,7 @@ python-multipart==0.0.9
 # =========================
 # ML / NLP
 # =========================
+numpy<2.0
 torch==2.5.1
 transformers==4.36.0
 huggingface-hub==0.20.3

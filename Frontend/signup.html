@@ -60,16 +60,10 @@
 document.addEventListener("DOMContentLoaded", function () {
 
   // =============================
-  // ENVIRONMENT-AWARE API URL
+  // BACKEND API URL
   // =============================
-  const API_BASE_URL =
-    location.hostname === "127.0.0.1" || location.hostname === "localhost"
-      ? "https://ai-translation-system-production.up.railway.app"
-      : location.origin;
+  const API_BASE_URL = "https://ai-translation-system-production.up.railway.app";
 
-  // =============================
-  // SAFE JWT CHECK
-  // =============================
   function isTokenExpired(token) {
     try {
       const parts = token.split(".");
@@ -84,8 +78,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // Auto redirect if already logged in
   const existingToken = localStorage.getItem("token");
+
   if (existingToken && !isTokenExpired(existingToken)) {
     window.location.replace("dashboard.html");
     return;
@@ -99,9 +93,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const errorMsg = document.getElementById("errorMsg");
   const signupBtn = document.getElementById("signupBtn");
 
-  // =============================
-  // ERROR MAPPER
-  // =============================
   function mapErrorMessage(code) {
     const errorMap = {
       INVALID_CREDENTIALS: "Invalid email or password.",
@@ -117,10 +108,8 @@ document.addEventListener("DOMContentLoaded", function () {
     return errorMap[code] || "Registration failed. Please try again.";
   }
 
-  // =============================
-  // SIGNUP HANDLER
-  // =============================
   form.addEventListener("submit", async function (e) {
+
     e.preventDefault();
 
     const fullName = document.getElementById("fullName").value.trim();
@@ -154,7 +143,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try {
 
-      // ---- SIGNUP ----
       const response = await fetch(`${API_BASE_URL}/signup`, {
         method: "POST",
         headers: {
@@ -167,18 +155,12 @@ document.addEventListener("DOMContentLoaded", function () {
         })
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error("Unexpected server response.");
-      }
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(mapErrorMessage(data.message));
+        throw new Error(mapErrorMessage(data.error_code));
       }
 
-      // ---- AUTO LOGIN ----
       const loginResponse = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: {
@@ -187,12 +169,7 @@ document.addEventListener("DOMContentLoaded", function () {
         body: JSON.stringify({ email, password })
       });
 
-      let loginData;
-      try {
-        loginData = await loginResponse.json();
-      } catch {
-        throw new Error("Unexpected login response.");
-      }
+      const loginData = await loginResponse.json();
 
       if (!loginResponse.ok || !loginData.access_token) {
         throw new Error("Auto-login failed. Please login manually.");
@@ -213,8 +190,10 @@ document.addEventListener("DOMContentLoaded", function () {
       errorMsg.classList.remove("hidden");
 
     } finally {
+
       signupBtn.disabled = false;
       signupBtn.textContent = "Sign Up";
+
     }
 
   });

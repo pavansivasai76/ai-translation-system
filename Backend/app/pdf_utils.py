@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 from typing import List, Dict
 
-from ocr_utils import extract_text_from_image
+from app.ocr_utils import extract_text_from_image
 
 
 # -------------------------------------------------

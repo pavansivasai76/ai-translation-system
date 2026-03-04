@@ -12,15 +12,15 @@ import re
 import os
 from dotenv import load_dotenv
 
-from database import SessionLocal
-from models import User
+from app.database import SessionLocal
+from app.models import User
 from passlib.context import CryptContext
 
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 
-from ocr_utils import extract_text_from_image
-from pdf_utils import extract_pdf_pages
+from app.ocr_utils import extract_text_from_image
+from app.pdf_utils import extract_pdf_pages
 
 from fastapi.responses import JSONResponse
 from fastapi.requests import Request
